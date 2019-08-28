@@ -1,331 +1,246 @@
-import re, sys, time, argparse
-
-def parse_address(string):
-	s = string[:-1]
-	s = s.lstrip("0")
-	if(len(s)>4):
-		raise ValueError("Address can not be greater than 0xFFFF")
-	return format(s, "04d")
+# import argparse
+import json
+import re
+import sys
 def parse_number(string):
-	s = string[:-1]
-	s = s.lstrip("0")
-	if(len(s)>2):
-		raise ValueError("Data can not be greater than 0xFF")
-	return format(s, "02d")
+    s = string.upper()
+    if s[0]<'0' or s[0]>'9':
+        return None
+    if s.endswith("H"):
+        try:
+            i = int(s[:-1], 16)
+            return i
+        except:
+            return None
+    elif s.endswith("D"):
+        try:
+            i = int(s[:-1], 10)
+            return i
+        except:
+            return None
+    elif s.endswith("O"):
+        try:
+            i = int(s[:-1], 8)
+            return i
+        except:
+            return None
+    elif s.endswith("B"):
+        try:
+            i = int(s[:-1], 2)
+            return i
+        except:
+            return None
+    else:
+        try:
+            i = int(s, 10)
+            return i
+        except:
+            return None
 
-opcode = [
-  (0xCE, "ACI", 0, "", "", 1),
-  (0x8F, "ADC", 1, "A", "", 0),
-  (0x88, "ADC", 1, "B", "", 0),
-  (0x89, "ADC", 1, "C", "", 0),
-  (0x8A, "ADC", 1, "D", "", 0),
-  (0x8B, "ADC", 1, "E", "", 0),
-  (0x8C, "ADC", 1, "H", "", 0),
-  (0x8D, "ADC", 1, "L", "", 0),
-  (0x8E, "ADC", 1, "M", "", 0),
-  (0x87, "ADD", 1, "A", "", 0),
-  (0x80, "ADD", 1, "B", "", 0),
-  (0x81, "ADD", 1, "C", "", 0),
-  (0x82, "ADD", 1, "D", "", 0),
-  (0x83, "ADD", 1, "E", "", 0),
-  (0x84, "ADD", 1, "H", "", 0),
-  (0x85, "ADD", 1, "L", "", 0),
-  (0x86, "ADD", 1, "M", "", 0),
-  (0xC6, "ADI", 0, "", "", 1),
-  (0xA7, "ANA", 1, "A", "", 0),
-  (0xA0, "ANA", 1, "B", "", 0),
-  (0xA1, "ANA", 1, "C", "", 0),
-  (0xA2, "ANA", 1, "D", "", 0),
-  (0xA3, "ANA", 1, "E", "", 0),
-  (0xA4, "ANA", 1, "H", "", 0),
-  (0xA5, "ANA", 1, "L", "", 0),
-  (0xA6, "ANA", 1, "M", "", 0),
-  (0xE6, "ANI", 0, "M", "", 1),
-  (0xCD, "CALL", 0, "M", "", 2),
-  (0xDC, "CC", 0, "M", "", 2),
-  (0xFC, "CM", 0, "M", "", 2),
-  (0x2F, "CMA", 0, "M", "", 0),
-  (0x3F, "CMC", 0, "M", "", 0),
-  (0xBF, "CMP", 1, "A", "", 0),
-  (0xB8, "CMP", 1, "B", "", 0),
-  (0xB9, "CMP", 1, "C", "", 0),
-  (0xBA, "CMP", 1, "D", "", 0),
-  (0xBB, "CMP", 1, "E", "", 0),
-  (0xBC, "CMP", 1, "H", "", 0),
-  (0xBD, "CMP", 1, "L", "", 0),
-  (0xBE, "CMP", 1, "M", "", 0),
-  (0xD4, "CNC", 0, "M", "", 2),
-  (0xC4, "CNZ", 0, "M", "", 2),
-  (0xF4, "CP", 0, "M", "", 2),
-  (0xEC, "CPE", 0, "M", "", 2),
-  (0xFE, "CPI", 0, "M", "", 1),
-  (0xE4, "CPO", 0, "M", "", 2),
-  (0xCC, "CZ", 0, "M", "", 2),
-  (0x27, "DAA", 0, "M", "", 0),
-  (0x09, "DAD", 1, "B", "", 0),
-  (0x19, "DAD", 1, "D", "", 0),
-  (0x29, "DAD", 1, "H", "", 0),
-  (0x39, "DAD", 1, "SP", "", 0),
-  (0x3D, "DCR", 1, "A", "", 0),
-  (0x05, "DCR", 1, "B", "", 0),
-  (0x0D, "DCR", 1, "C", "", 0),
-  (0x15, "DCR", 1, "D", "", 0),
-  (0x1D, "DCR", 1, "E", "", 0),
-  (0x25, "DCR", 1, "H", "", 0),
-  (0x2D, "DCR", 1, "L", "", 0),
-  (0x35, "DCR", 1, "M", "", 0),
-  (0x0B, "DCX", 1, "B", "", 0),
-  (0x1B, "DCX", 1, "D", "", 0),
-  (0x2B, "DCX", 1, "H", "", 0),
-  (0x3B, "DCX", 1, "SP", "", 0),
-  (0xF3, "DI", 0, "", "", 0),
-  (0xFB, "EI", 0, "", "", 0),
-  (0x76, "HLT", 0, "", "", 0),
-  (0xDB, "IN", 0, "", "", 1),
-  (0x3C, "INR", 1, "A", "", 0),
-  (0x04, "INR", 1, "B", "", 0),
-  (0x0C, "INR", 1, "C", "", 0),
-  (0x14, "INR", 1, "D", "", 0),
-  (0x1C, "INR", 1, "E", "", 0),
-  (0x24, "INR", 1, "H", "", 0),
-  (0x2C, "INR", 1, "L", "", 0),
-  (0x34, "INR", 1, "M", "", 0),
-  (0x03, "INX", 1, "B", "", 0),
-  (0x13, "INX", 1, "D", "", 0),
-  (0x23, "INX", 1, "H", "", 0),
-  (0x33, "INX", 1, "SP", "", 0),
-  (0xDA, "JC", 0, "", "", 2),
-  (0xFA, "JM", 0, "", "", 2),
-  (0xC3, "JMP", 0, "", "", 2),
-  (0xD2, "JNC", 0, "", "", 2),
-  (0xC2, "JNZ", 0, "", "", 2),
-  (0xF2, "JP", 0, "", "", 2),
-  (0xEA, "JPE", 0, "", "", 2),
-  (0xE2, "JPO", 0, "", "", 2),
-  (0xCA, "JZ", 0, "", "", 2),
-  (0x3A, "LDA", 0, "", "", 2),
-  (0x0A, "LDAX", 1, "B", "", 0),
-  (0x1A, "LDAX", 1, "D", "", 0),
-  (0x2A, "LHLD", 0, "", "", 2),
-  (0x01, "LXI", 1, "B", "", 2),
-  (0x11, "LXI", 1, "D", "", 2),
-  (0x21, "LXI", 1, "H", "", 2),
-  (0x31, "LXI", 1, "SP", "", 2),
-  (0x7F, "MOV", 2, "A", "A", 0),
-  (0x78, "MOV", 2, "A", "B", 0),
-  (0x79, "MOV", 2, "A", "C", 0),
-  (0x7A, "MOV", 2, "A", "D", 0),
-  (0x7B, "MOV", 2, "A", "E", 0),
-  (0x7C, "MOV", 2, "A", "H", 0),
-  (0x7D, "MOV", 2, "A", "L", 0),
-  (0x7E, "MOV", 2, "A", "M", 0),
-  (0x47, "MOV", 2, "B", "A", 0),
-  (0x40, "MOV", 2, "B", "B", 0),
-  (0x41, "MOV", 2, "B", "C", 0),
-  (0x42, "MOV", 2, "B", "D", 0),
-  (0x43, "MOV", 2, "B", "E", 0),
-  (0x44, "MOV", 2, "B", "H", 0),
-  (0x45, "MOV", 2, "B", "L", 0),
-  (0x46, "MOV", 2, "B", "M", 0),
-  (0x4F, "MOV", 2, "C", "A", 0),
-  (0x48, "MOV", 2, "C", "B", 0),
-  (0x49, "MOV", 2, "C", "C", 0),
-  (0x4A, "MOV", 2, "C", "D", 0),
-  (0x4B, "MOV", 2, "C", "E", 0),
-  (0x4C, "MOV", 2, "C", "H", 0),
-  (0x4D, "MOV", 2, "C", "L", 0),
-  (0x4E, "MOV", 2, "C", "M", 0),
-  (0x57, "MOV", 2, "D", "A", 0),
-  (0x50, "MOV", 2, "D", "B", 0),
-  (0x51, "MOV", 2, "D", "C", 0),
-  (0x52, "MOV", 2, "D", "D", 0),
-  (0x53, "MOV", 2, "D", "E", 0),
-  (0x54, "MOV", 2, "D", "H", 0),
-  (0x55, "MOV", 2, "D", "L", 0),
-  (0x56, "MOV", 2, "D", "M", 0),
-  (0x5F, "MOV", 2, "E", "A", 0),
-  (0x58, "MOV", 2, "E", "B", 0),
-  (0x59, "MOV", 2, "E", "C", 0),
-  (0x5A, "MOV", 2, "E", "D", 0),
-  (0x5B, "MOV", 2, "E", "E", 0),
-  (0x5C, "MOV", 2, "E", "H", 0),
-  (0x5D, "MOV", 2, "E", "L", 0),
-  (0x5E, "MOV", 2, "E", "M", 0),
-  (0x67, "MOV", 2, "H", "A", 0),
-  (0x60, "MOV", 2, "H", "B", 0),
-  (0x61, "MOV", 2, "H", "C", 0),
-  (0x62, "MOV", 2, "H", "D", 0),
-  (0x63, "MOV", 2, "H", "E", 0),
-  (0x64, "MOV", 2, "H", "H", 0),
-  (0x65, "MOV", 2, "H", "L", 0),
-  (0x66, "MOV", 2, "H", "M", 0),
-  (0x6F, "MOV", 2, "L", "A", 0),
-  (0x68, "MOV", 2, "L", "B", 0),
-  (0x69, "MOV", 2, "L", "C", 0),
-  (0x6A, "MOV", 2, "L", "D", 0),
-  (0x6B, "MOV", 2, "L", "E", 0),
-  (0x6C, "MOV", 2, "L", "H", 0),
-  (0x6D, "MOV", 2, "L", "L", 0),
-  (0x6E, "MOV", 2, "L", "M", 0),
-  (0x77, "MOV", 2, "M", "A", 0),
-  (0x70, "MOV", 2, "M", "B", 0),
-  (0x71, "MOV", 2, "M", "C", 0),
-  (0x72, "MOV", 2, "M", "D", 0),
-  (0x73, "MOV", 2, "M", "E", 0),
-  (0x74, "MOV", 2, "M", "H", 0),
-  (0x75, "MOV", 2, "M", "L", 0),
-  (0x3E, "MVI", 1, "A", "", 1),
-  (0x06, "MVI", 1, "B", "", 1),
-  (0x0E, "MVI", 1, "C", "", 1),
-  (0x16, "MVI", 1, "D", "", 1),
-  (0x1E, "MVI", 1, "E", "", 1),
-  (0x26, "MVI", 1, "H", "", 1),
-  (0x2E, "MVI", 1, "L", "", 1),
-  (0x36, "MVI", 1, "M", "", 1),
-  (0x00, "NOP", 0, "M", "", 0),
-  (0xB7, "ORA", 1, "A", "", 0),
-  (0xB0, "ORA", 1, "B", "", 0),
-  (0xB1, "ORA", 1, "C", "", 0),
-  (0xB2, "ORA", 1, "D", "", 0),
-  (0xB3, "ORA", 1, "E", "", 0),
-  (0xB4, "ORA", 1, "H", "", 0),
-  (0xB5, "ORA", 1, "L", "", 0),
-  (0xB6, "ORA", 1, "M", "", 0),
-  (0xF6, "ORI", 0, "M", "", 1),
-  (0xD3, "OUT", 0, "M", "", 1),
-  (0xE9, "PCHL", 0, "M", "", 0),
-  (0xC0, "RNZ", 0, "B", "", 0),
-  (0xC1, "POP", 1, "B", "", 0),
-  (0xD1, "POP", 1, "D", "", 0),
-  (0xE1, "POP", 1, "H", "", 0),
-  (0xF1, "POP", 1, "PSW", "", 0),
-  (0xC5, "PUSH", 1, "B", "", 0),
-  (0xD5, "PUSH", 1, "D", "", 0),
-  (0xE5, "PUSH", 1, "H", "", 0),
-  (0xF5, "PUSH", 1, "PSW", "", 0),
-  (0x17, "RAL", 0, "M", "", 0),
-  (0x1F, "RAR", 0, "M", "", 0),
-  (0xD8, "RC", 0, "M", "", 0),
-  (0xC9, "RET", 0, "M", "", 0),
-  (0x20, "RIM", 0, "M", "", 0),
-  (0x07, "RLC", 0, "M", "", 0),
-  (0xF8, "RM", 0, "M", "", 0),
-  (0xD0, "RNC", 0, "M", "", 0),
-  (0xF0, "RP", 0, "M", "", 0),
-  (0xE8, "RPE", 0, "M", "", 0),
-  (0xE0, "RPO", 0, "M", "", 0),
-  (0x0F, "RRC", 0, "M", "", 0),
-  (0xC7, "RST", 1, "0", "", 0),
-  (0xCF, "RST", 1, "1", "", 0),
-  (0xD7, "RST", 1, "2", "", 0),
-  (0xDF, "RST", 1, "3", "", 0),
-  (0xE7, "RST", 1, "4", "", 0),
-  (0xEF, "RST", 1, "5", "", 0),
-  (0xF7, "RST", 1, "6", "", 0),
-  (0xFF, "RST", 1, "7", "", 0),
-  (0xC8, "RZ", 0, "", "", 0),
-  (0x9F, "SBB", 1, "A", "", 0),
-  (0x98, "SBB", 1, "B", "", 0),
-  (0x99, "SBB", 1, "C", "", 0),
-  (0x9A, "SBB", 1, "D", "", 0),
-  (0x9B, "SBB", 1, "E", "", 0),
-  (0x9C, "SBB", 1, "H", "", 0),
-  (0x9D, "SBB", 1, "L", "", 0),
-  (0x9E, "SBB", 1, "M", "", 0),
-  (0xDE, "SBI", 0, "M", "", 1),
-  (0x22, "SHLD", 0, "M", "", 2),
-  (0x30, "SIM", 0, "M", "", 0),
-  (0xF9, "SPHL", 0, "M", "", 0),
-  (0x32, "STA", 0, "M", "", 2),
-  (0x02, "STAX", 1, "B", "", 0),
-  (0x12, "STAX", 1, "D", "", 0),
-  (0x37, "STC", 0, "M", "", 0),
-  (0x97, "SUB", 1, "A", "", 0),
-  (0x90, "SUB", 1, "B", "", 0),
-  (0x91, "SUB", 1, "C", "", 0),
-  (0x92, "SUB", 1, "D", "", 0),
-  (0x93, "SUB", 1, "E", "", 0),
-  (0x94, "SUB", 1, "H", "", 0),
-  (0x95, "SUB", 1, "L", "", 0),
-  (0x96, "SUB", 1, "M", "", 0),
-  (0xD6, "SUI", 0, "M", "", 1),
-  (0xEB, "XCHG", 0, "M", "", 0),
-  (0xAF, "XRA", 1, "A", "", 0),
-  (0xA8, "XRA", 1, "B", "", 0),
-  (0xA9, "XRA", 1, "C", "", 0),
-  (0xAA, "XRA", 1, "D", "", 0),
-  (0xAB, "XRA", 1, "E", "", 0),
-  (0xAC, "XRA", 1, "H", "", 0),
-  (0xAD, "XRA", 1, "L", "", 0),
-  (0xAE, "XRA", 1, "M", "", 0),
-  (0xEE, "XRI", 0, "M", "", 1),
-  (0xE3, "XTHL", 0, "M", "", 0),
-  (0xFF, "ENDO", 0, "", "", 0)
-]
+
+opcodes = json.loads('{"aci":{"list":[{"val":206}],"no":1,"op1type":"8bit","op2type":null,"size":2},"adc":{"list":[{"op1":"b","val":136},{"op1":"c","val":137},{"op1":"d","val":138},{"op1":"e","val":139},{"op1":"h","val":140},{"op1":"l","val":141},{"op1":"m","val":142},{"op1":"a","val":143}],"no":1,"op1type":"reg","op2type":null,"size":1},"add":{"list":[{"op1":"b","val":128},{"op1":"c","val":129},{"op1":"d","val":130},{"op1":"e","val":131},{"op1":"h","val":132},{"op1":"l","val":133},{"op1":"m","val":134},{"op1":"a","val":135}],"no":1,"op1type":"reg","op2type":null,"size":1},"adi":{"list":[{"val":198}],"no":1,"op1type":"8bit","op2type":null,"size":2},"ana":{"list":[{"op1":"b","val":160},{"op1":"c","val":161},{"op1":"d","val":162},{"op1":"e","val":163},{"op1":"h","val":164},{"op1":"l","val":165},{"op1":"m","val":166},{"op1":"a","val":167}],"no":1,"op1type":"reg","op2type":null,"size":1},"ani":{"list":[{"val":230}],"no":1,"op1type":"8bit","op2type":null,"size":2},"call":{"list":[{"val":205}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cc":{"list":[{"val":220}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cm":{"list":[{"val":252}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cma":{"list":[{"val":47}],"no":0,"op1type":null,"op2type":null,"size":1},"cmc":{"list":[{"val":63}],"no":0,"op1type":null,"op2type":null,"size":1},"cmp":{"list":[{"op1":"b","val":184},{"op1":"c","val":185},{"op1":"d","val":186},{"op1":"e","val":187},{"op1":"h","val":188},{"op1":"l","val":189},{"op1":"m","val":190},{"op1":"a","val":191}],"no":1,"op1type":"reg","op2type":null,"size":1},"cnc":{"list":[{"val":212}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cnz":{"list":[{"val":196}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cp":{"list":[{"val":244}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cpe":{"list":[{"val":236}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cpi":{"list":[{"val":254}],"no":1,"op1type":"8bit","op2type":null,"size":2},"cpo":{"list":[{"val":228}],"no":1,"op1type":"16bit","op2type":null,"size":3},"cz":{"list":[{"val":204}],"no":1,"op1type":"16bit","op2type":null,"size":3},"daa":{"list":[{"val":39}],"no":0,"op1type":null,"op2type":null,"size":1},"dad":{"list":[{"op1":"b","val":9},{"op1":"d","val":25},{"op1":"h","val":41},{"op1":"sp","val":57}],"no":1,"op1type":"reg","op2type":null,"size":1},"dcr":{"list":[{"op1":"b","val":5},{"op1":"c","val":13},{"op1":"d","val":21},{"op1":"e","val":29},{"op1":"h","val":37},{"op1":"l","val":45},{"op1":"m","val":53},{"op1":"a","val":61}],"no":1,"op1type":"reg","op2type":null,"size":1},"dcx":{"list":[{"op1":"b","val":11},{"op1":"d","val":27},{"op1":"h","val":43},{"op1":"sp","val":59}],"no":1,"op1type":"reg","op2type":null,"size":1},"di":{"list":[{"val":243}],"no":0,"op1type":null,"op2type":null,"size":1},"ei":{"list":[{"val":251}],"no":0,"op1type":null,"op2type":null,"size":1},"hlt":{"list":[{"val":118}],"no":0,"op1type":null,"op2type":null,"size":1},"in":{"list":[{"val":219}],"no":1,"op1type":"8bit","op2type":null,"size":2},"inr":{"list":[{"op1":"b","val":4},{"op1":"c","val":12},{"op1":"d","val":20},{"op1":"e","val":28},{"op1":"h","val":36},{"op1":"l","val":44},{"op1":"m","val":52},{"op1":"a","val":60}],"no":1,"op1type":"reg","op2type":null,"size":1},"inx":{"list":[{"op1":"b","val":3},{"op1":"d","val":19},{"op1":"h","val":35},{"op1":"sp","val":51}],"no":1,"op1type":"reg","op2type":null,"size":1},"jc":{"list":[{"val":218}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jm":{"list":[{"val":250}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jmp":{"list":[{"val":195}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jnc":{"list":[{"val":210}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jnz":{"list":[{"val":194}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jp":{"list":[{"val":242}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jpe":{"list":[{"val":234}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jpo":{"list":[{"val":226}],"no":1,"op1type":"16bit","op2type":null,"size":3},"jz":{"list":[{"val":202}],"no":1,"op1type":"16bit","op2type":null,"size":3},"lda":{"list":[{"val":58}],"no":1,"op1type":"16bit","op2type":null,"size":3},"ldax":{"list":[{"op1":"b","val":10},{"op1":"d","val":26}],"no":1,"op1type":"reg","op2type":null,"size":1},"lhld":{"list":[{"val":42}],"no":1,"op1type":"16bit","op2type":null,"size":3},"lxi":{"list":[{"op1":"b","val":1},{"op1":"d","op2":"16bit","val":17},{"op1":"h","op2":"16bit","val":33},{"op1":"sp","op2":"16bit","val":49}],"no":2,"op1type":"reg","op2type":"16bit","size":3},"mov":{"list":[{"op1":"b","op2":"b","val":64},{"op1":"b","op2":"c","val":65},{"op1":"b","op2":"d","val":66},{"op1":"b","op2":"e","val":67},{"op1":"b","op2":"h","val":68},{"op1":"b","op2":"l","val":69},{"op1":"b","op2":"m","val":70},{"op1":"b","op2":"a","val":71},{"op1":"c","op2":"b","val":72},{"op1":"c","op2":"c","val":73},{"op1":"c","op2":"d","val":74},{"op1":"c","op2":"e","val":75},{"op1":"c","op2":"h","val":76},{"op1":"c","op2":"l","val":77},{"op1":"c","op2":"m","val":78},{"op1":"c","op2":"a","val":79},{"op1":"d","op2":"b","val":80},{"op1":"d","op2":"c","val":81},{"op1":"d","op2":"d","val":82},{"op1":"d","op2":"e","val":83},{"op1":"d","op2":"h","val":84},{"op1":"d","op2":"l","val":85},{"op1":"d","op2":"m","val":86},{"op1":"d","op2":"a","val":87},{"op1":"e","op2":"b","val":88},{"op1":"e","op2":"c","val":89},{"op1":"e","op2":"d","val":90},{"op1":"e","op2":"e","val":91},{"op1":"e","op2":"h","val":92},{"op1":"e","op2":"l","val":93},{"op1":"e","op2":"m","val":94},{"op1":"e","op2":"a","val":95},{"op1":"h","op2":"b","val":96},{"op1":"h","op2":"c","val":97},{"op1":"h","op2":"d","val":98},{"op1":"h","op2":"e","val":99},{"op1":"h","op2":"h","val":100},{"op1":"h","op2":"l","val":101},{"op1":"h","op2":"m","val":102},{"op1":"h","op2":"a","val":103},{"op1":"l","op2":"b","val":104},{"op1":"l","op2":"c","val":105},{"op1":"l","op2":"d","val":106},{"op1":"l","op2":"e","val":107},{"op1":"l","op2":"h","val":108},{"op1":"l","op2":"l","val":109},{"op1":"l","op2":"m","val":110},{"op1":"l","op2":"a","val":111},{"op1":"m","op2":"b","val":112},{"op1":"m","op2":"c","val":113},{"op1":"m","op2":"d","val":114},{"op1":"m","op2":"e","val":115},{"op1":"m","op2":"h","val":116},{"op1":"m","op2":"l","val":117},{"op1":"m","op2":"a","val":119},{"op1":"a","op2":"b","val":120},{"op1":"a","op2":"c","val":121},{"op1":"a","op2":"d","val":122},{"op1":"a","op2":"e","val":123},{"op1":"a","op2":"h","val":124},{"op1":"a","op2":"l","val":125},{"op1":"a","op2":"m","val":126},{"op1":"a","op2":"a","val":127}],"no":2,"op1type":"reg","op2type":"reg","size":1},"mvi":{"list":[{"op1":"b","val":6},{"op1":"c","op2":"8bit","val":14},{"op1":"d","op2":"8bit","val":22},{"op1":"e","op2":"8bit","val":30},{"op1":"h","op2":"8bit","val":38},{"op1":"l","op2":"8bit","val":46},{"op1":"m","op2":"8bit","val":54},{"op1":"a","op2":"8bit","val":62}],"no":2,"op1type":"reg","op2type":"8bit","size":2},"nop":{"list":[{"val":0}],"no":0,"op1type":null,"op2type":null,"size":1},"ora":{"list":[{"op1":"b","val":176},{"op1":"c","val":177},{"op1":"d","val":178},{"op1":"e","val":179},{"op1":"h","val":180},{"op1":"l","val":181},{"op1":"m","val":182},{"op1":"a","val":183}],"no":1,"op1type":"reg","op2type":null,"size":1},"ori":{"list":[{"val":246}],"no":1,"op1type":"8bit","op2type":null,"size":2},"out":{"list":[{"val":211}],"no":1,"op1type":"8bit","op2type":null,"size":2},"pchl":{"list":[{"val":233}],"no":0,"op1type":null,"op2type":null,"size":1},"pop":{"list":[{"op1":"b","val":193},{"op1":"h","val":225},{"op1":"psw","val":241}],"no":1,"op1type":"reg","op2type":null,"size":1},"popd":{"list":[{"val":209}],"no":0,"op1type":null,"op2type":null,"size":1},"push":{"list":[{"op1":"b","val":197},{"op1":"d","val":213},{"op1":"h","val":229},{"op1":"psw","val":245}],"no":1,"op1type":"reg","op2type":null,"size":1},"ral":{"list":[{"val":23}],"no":0,"op1type":null,"op2type":null,"size":1},"rar":{"list":[{"val":31}],"no":0,"op1type":null,"op2type":null,"size":1},"rc":{"list":[{"val":216}],"no":0,"op1type":null,"op2type":null,"size":1},"ret":{"list":[{"val":201}],"no":0,"op1type":null,"op2type":null,"size":1},"rim":{"list":[{"val":32}],"no":0,"op1type":null,"op2type":null,"size":1},"rlc":{"list":[{"val":7}],"no":0,"op1type":null,"op2type":null,"size":1},"rm":{"list":[{"val":248}],"no":0,"op1type":null,"op2type":null,"size":1},"rnc":{"list":[{"val":208}],"no":0,"op1type":null,"op2type":null,"size":1},"rnz":{"list":[{"val":192}],"no":0,"op1type":null,"op2type":null,"size":1},"rp":{"list":[{"val":240}],"no":0,"op1type":null,"op2type":null,"size":1},"rpe":{"list":[{"val":232}],"no":0,"op1type":null,"op2type":null,"size":1},"rpo":{"list":[{"val":224}],"no":0,"op1type":null,"op2type":null,"size":1},"rrc":{"list":[{"val":15}],"no":0,"op1type":null,"op2type":null,"size":1},"rst":{"list":[{"op1":"0","val":199},{"op1":"1","val":207},{"op1":"2","val":215},{"op1":"3","val":223},{"op1":"4","val":231},{"op1":"5","val":239},{"op1":"6","val":247},{"op1":"7","val":255}],"no":1,"op1type":"reg","op2type":null,"size":1},"rz":{"list":[{"val":200}],"no":0,"op1type":null,"op2type":null,"size":1},"sbb":{"list":[{"op1":"b","val":152},{"op1":"c","val":153},{"op1":"d","val":154},{"op1":"e","val":155},{"op1":"h","val":156},{"op1":"l","val":157},{"op1":"m","val":158},{"op1":"a","val":159}],"no":1,"op1type":"reg","op2type":null,"size":1},"sbi":{"list":[{"val":222}],"no":1,"op1type":"8bit","op2type":null,"size":2},"shld":{"list":[{"val":34}],"no":1,"op1type":"16bit","op2type":null,"size":3},"sim":{"list":[{"val":48}],"no":0,"op1type":null,"op2type":null,"size":1},"sphl":{"list":[{"val":249}],"no":0,"op1type":null,"op2type":null,"size":1},"sta":{"list":[{"val":50}],"no":1,"op1type":"16bit","op2type":null,"size":3},"stax":{"list":[{"op1":"b","val":2},{"op1":"d","val":18}],"no":1,"op1type":"reg","op2type":null,"size":1},"stc":{"list":[{"val":55}],"no":0,"op1type":null,"op2type":null,"size":1},"sub":{"list":[{"op1":"b","val":144},{"op1":"c","val":145},{"op1":"d","val":146},{"op1":"e","val":147},{"op1":"h","val":148},{"op1":"l","val":149},{"op1":"m","val":150},{"op1":"a","val":151}],"no":1,"op1type":"reg","op2type":null,"size":1},"sui":{"list":[{"val":214}],"no":1,"op1type":"8bit","op2type":null,"size":2},"xchg":{"list":[{"val":235}],"no":0,"op1type":null,"op2type":null,"size":1},"xra":{"list":[{"op1":"b","val":168},{"op1":"c","val":169},{"op1":"d","val":170},{"op1":"e","val":171},{"op1":"h","val":172},{"op1":"l","val":173},{"op1":"m","val":174},{"op1":"a","val":175}],"no":1,"op1type":"reg","op2type":null,"size":1},"xri":{"list":[{"val":238}],"no":1,"op1type":"8bit","op2type":null,"size":2},"xthl":{"list":[{"val":227}],"no":0,"op1type":null,"op2type":null,"size":1}}')
+
+regex = re.compile(r"^[ \t]*((?P<label>([a-zA-Z_][a-zA-Z0-9_]*))[ \t]*:)?[ \t]*((?P<opc>[a-zA-Z]+)[ \t]*([ \t](?P<op1>[a-zA-Z0-9_]+)([ \t]*\,[ \t]*(?P<op2>[a-zA-Z0-9_]+))?)?)?[ \t\n\f\r\v]*(;.*)?$")
+# print(json.dumps(opcodes))
 ############################## Argument Parsing ##############################
 asmfile = sys.argv[1]
 f = asmfile.rsplit(".", 1)[0]
 lstfile = f+".lst"
 hexfile = f+".hex"
 
-############################## Tokenization ##############################
-symbols = []
+############################## Pass 1 ##############################
+org = 0
+parsed_line = []
+symbols = {}
 with open(asmfile, "r") as f:
-	for line in f:
-		print("Line = "+line)
-		line = line.lower()
-		till_now = ""
-		for word in line:
-			# print("till_now = ", till_now)
-			# print("word = ", word)
-			if word.isspace():
-				if till_now != "":
-					symbols.append(till_now)
-					till_now = ""
-			elif word == ",":
-				if till_now != "":
-					symbols.append(till_now)
-				symbols.append(",")
-				till_now = ""
-			elif word == ":":
-				if till_now != "":
-					symbols.append(till_now)
-				symbols.append(":")
-				till_now = ""
-			elif word in "abcdefghijklmnopqrstuvwxyz0123456789_":
-				till_now += word
-			elif word == ";":
-				if till_now != "":
-					symbols.append(till_now)
-				symbols.append(",")				
-		if till_now != "":
-			symbols.append(till_now)
-		symbols.append("")
-####################### Make LST File #######################
-with open("out.txt", "w") as f:
-	i = 0
-	start_addr = 0x9000
-	mnemoinc = ""
-	operand_no = 0
-	operand1 = ""
-	operand2 = ""
-	t1 = False
-	
-	org = [i for i,x in enumerate([1,2,3,2]) if x==2]
-	if len(org) > 1:
-		print("Error at ")
+    lines = f.readlines()
+for i, line in enumerate(lines, 1):
+    stripped_line = line.strip()
+    a = regex.match(line)
+    if a is None:
+        print("Error at line", i)
+        print("\t", stripped_line, sep="")
+        exit()
+    label = a.group("label")
+    opc = a.group("opc")
+    op1 = a.group("op1")
+    op2 = a.group("op2")
+    if opc is not None:
+        opc = opc.lower()
+    if op1 is None:
+        opno = 0
+    elif op2 is None:
+        opno = 1
+    else:
+        opno = 2
+    if label is None and opc is None:
+        continue
 
+    if label is not None:
+        if label in symbols:
+            print(f"Error at line {i}: Address of {label} already declared to be {symbols[label]}")
+            print(stripped_line)
+            exit()
+        if opc is not None and opc == "equ":
+            if opno != 1:
+                print(f"Error at line {i}: \"EQU\" needs exactly 1 operand")
+                print(stripped_line)
+                exit()
+            temp_hex = parse_number(op1)
+            if temp_hex is None or temp_hex < 0 or temp_hex >0xFFFF:
+                print(f"Error at line {i}: Value of operand {label} is invalid")
+                print(stripped_line)
+                exit()
+            symbols[label] = format(temp_hex, "04X")
+        elif opc is not None and opc == "org":
+            if opno != 1:
+                print(f"Error at line {i}: \"ORG\" needs exactly 1 operand")
+                print(stripped_line)
+                exit()
+            temp_hex = parse_number(op1)
+            if temp_hex is None or temp_hex < 0 or temp_hex >0xFFFF:
+                print(f"Error at line {i}: Value of operand {op1} is invalid")
+                print(stripped_line)
+                exit()
+            symbols[label] = format(temp_hex, "04X")
+            org = temp_hex
+        else:
+            symbols[label] = format(org, "04X")
+    if opc is not None:
+        if opc != "org" and opc != "equ":
+            tup = (i, org, opc, opno, op1, op2, stripped_line)
+            parsed_line.append(tup)
+        if opc in opcodes:
+            org += opcodes[opc]["size"]
+        elif opc == "org":
+            if label is None:
+                if opno != 1:
+                    print(f"Error at line {i}: \"ORG\" needs exactly 1 operand")
+                    print(stripped_line)
+                    exit()
+                temp_hex = parse_number(op1)
+                if temp_hex is None or temp_hex < 0 or temp_hex >0xFFFF:
+                    print(f"Error at line {i}: Value of operand {label} is invalid")
+                    print(stripped_line)
+                    exit()
+                org = temp_hex
+        elif opc == "equ":
+            if label is None:
+                print("Error at line {i}, \"EQU\" does not have any label to associate value to")
+                print(stripped_line)
+                exit()
+        else:
+            print(f"Error at line {i}: Unknown opcode {opc}")
+            print(stripped_line)
+            exit()
 
-	while i < len(symbols) and not t1:
-		if symbols[i] == "cpu":
-			i += 1
-		elif symbols[i] == "hof":
-			i += 1
-		elif symbols[i] == "org" and not t1:
-			i += 1
-			t1 = True
-			start_addr = parse_address(symbols[i])
-		i += 1
+print(symbols)
+# print(parsed_line)
 
+############################## Pass 2 ##############################
+hexcodes = {}
+for i, adr, opc, opno, op1, op2, line in parsed_line:
+    if opc not in opcodes:
+        print(f"Error at line {i}: Unknown opcode {opc})")
+        print(line)
+        exit()
+    temp = opcodes[opc]
+    no = temp["no"]
+    lst = temp["list"]
+    op1type = temp["op1type"]
+    op2type = temp["op2type"]
+    if opno != no:
+        print(f"Error at line {i}: \"{opc.upper()}\" needs exactly {no} operand(s)")
+        print(line)
+        exit()
 
+    if op1type is None and op2type is None:
+        hexcodes[adr] = format(lst[0]["val"], "02X")
+    elif op1type is not None and op2type is None:
+        if op1type == 'reg':
+            for d in lst:
+                reg = d["op1"]
+                val = d["val"]
+                if reg == op1:
+                    break
+            hexcodes[adr] = format(val, "02X")
+        elif op1type == "8bit":
+            temp_hex = parse_number(op1)
+            if temp_hex is None or temp_hex < 0 or temp_hex > 0xFF:
+                print(f"Error at line {i}: Value of operand {op1} is invalid")
+                print(line)
+                exit()
+            hexcodes[adr] = format(lst[0]["val"], "02X")
+            hexcodes[adr+1] = format(temp_hex, "02X")
+        elif op1type == "16bit":# TODO labels need substitution
+            temp_hex = parse_number(op1)
+            if temp_hex is None or temp_hex < 0 or temp_hex > 0xFFFF:
+                print(f"Error at line {i}: Value of operand {op1} is invalid")
+                print(line)
+                exit()
+            temp_hex = format(temp_hex, "04X")
+            hexcodes[adr] = lst[0]["val"]
+            hexcodes[adr+2] = temp_hex[0:1]
+            hexcodes[adr+1] = temp_hex[2:3]
+    elif op1type is not None and op2type is not None:
+        if op2type == 'reg':
+            found = False
+            for d in lst:
+                o1 = d["op1"]
+                o2 = d["op2"]
+                val = d["val"]
+                if o1 == op1 and o2 == op2:
+                    found = True
+                    break
+            if found:
+                hexcodes[adr] = format(val, "02X")
+            else:
+                print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
+                print(line)
+                exit()
+        elif op2type == "8bit":
+            found = False
+            for d in lst:
+                o1 = d["op1"]
+                val = d["val"]
+                if o1 == op1:
+                    found = True
+                    break
+            if found:
+                temp_hex = parse_number(op2)
+                if temp_hex is None or temp_hex < 0 or temp_hex > 0xFF:
+                    print(f"Error at line {i}: Value of 2nd operand {op2} is invalid")
+                    print(line)
+                    exit()
+                hexcodes[adr] = format(val, "02X")
+                hexcodes[adr+1] = format(temp_hex, "02X")
+            else:
+                print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
+                print(line)
+                exit()
+        elif op2type == "16bit": # TODO Labels need substitution
+            found = False
+            for d in lst:
+                o1 = d["op1"]
+                val = d["val"]
+                if o1 == op1:
+                    found = True
+                    break
+            if found:
+                temp_hex = parse_number(op2)
+                if temp_hex is None or temp_hex < 0 or temp_hex > 0xFFFF:
+                    print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
+                    print(line)
+                    exit()
+                temp_hex = format(temp_hex, "04X")
+                hexcodes[adr] = format(val, "02X")
+                hexcodes[adr+1] = temp_hex[2:3]
+                hexcodes[adr+2] = temp_hex[0:1]
+            else:
+                print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
+                print(line)
+                exit()
+                            
+print(hexcodes)
 
+############################## Hex Output ##############################
