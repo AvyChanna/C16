@@ -1,6 +1,6 @@
 ; cpu "8085.tbl"
 ; hof "int8"
-; l2555:equ 0FFh; 255
+; l2555:equ 0ffh; 255
 ; org 0fffh; 
 ; l4095:mov a,b
 ; l4096:mov a,b
@@ -11,20 +11,15 @@
 ; mov a,b
 ; jz 1h
 ; l9:jz labe2l
-l1:
-l2:org 0fffh
-l3:mov a, b
-cpi 11h
-mvi a, 02H
-cma
-hlt
-nop
-;
-; 4095=78=78
-; 4096=FE=fe
-; 4097=11=11
-; 4098=3E=3e
-; 4099=02=02
-; 4100=2F=2f
-; 4101=76=76
-; 4102=00=00
+l1:org 1234h
+rz;		c8
+rst 1;	cf
+dad b;	09
+mov c, m; 4e
+pop psw; f1
+mvi a, 45h;	3e 45
+adi 60d; c6 3c
+lxi b, l1;	01 34 12
+lxi h, 7890h;	21 90 78
+sta l1; 32 34 12
+sta 1234h; 32 34 12
