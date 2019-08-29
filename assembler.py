@@ -90,7 +90,8 @@ for i, line in enumerate(lines, 1):
                 print(f"Error at line {i}: Value of operand {label} is invalid")
                 print(stripped_line)
                 exit()
-            symbols[label] = format(temp_hex, "04X")
+            #* symbols[label] = format(temp_hex, "04X")
+            symbols[label] = temp_hex
         elif opc is not None and opc == "org":
             if opno != 1:
                 print(f"Error at line {i}: \"ORG\" needs exactly 1 operand")
@@ -101,10 +102,12 @@ for i, line in enumerate(lines, 1):
                 print(f"Error at line {i}: Value of operand {op1} is invalid")
                 print(stripped_line)
                 exit()
-            symbols[label] = format(temp_hex, "04X")
+            #* symbols[label] = format(temp_hex, "04X")
+            symbols[label] = temp_hex
             org = temp_hex
         else:
-            symbols[label] = format(org, "04X")
+            #* symbols[label] = format(org, "04X")
+            symbols[label] = org
     if opc is not None:
         if opc != "org" and opc != "equ":
             tup = (i, org, opc, opno, op1, op2, stripped_line)
@@ -136,7 +139,7 @@ for i, line in enumerate(lines, 1):
 # print(symbols)
 print("================== Symbols ==================")
 for key, value in sorted(symbols.items()):
-    print(f"label[\"{key}\"] = {value}")
+    print(f"label[\"{key}\"] = {format(value, '02X')}")
 # print(parsed_line)
 
 ############################## Pass 2 ##############################
@@ -157,7 +160,8 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
         exit()
 
     if op1type is None and op2type is None:
-        hexcodes[adr] = format(lst[0]["val"], "02X")
+        #* hexcodes[adr] = format(lst[0]["val"], "02X")
+        hexcodes[adr] = lst[0]["val"]
     elif op1type is not None and op2type is None:
         if op1type == 'reg':
             op1 = op1.lower()
@@ -166,7 +170,8 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 val = d["val"]
                 if reg == op1:
                     break
-            hexcodes[adr] = format(val, "02X")
+            #* hexcodes[adr] = format(val, "02X")
+            hexcodes[adr] = val
         elif op1type == "8bit":
             op1 = op1.lower()
             temp_hex = parse_number(op1)
@@ -174,9 +179,11 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 print(f"Error at line {i}: Value of operand {op1} is invalid")
                 print(line)
                 exit()
-            hexcodes[adr] = format(lst[0]["val"], "02X")
-            hexcodes[adr+1] = format(temp_hex, "02X")
-        elif op1type == "16bit":# TODO labels need substitution
+            #* hexcodes[adr] = format(lst[0]["val"], "02X")
+            hexcodes[adr] = lst[0]["val"]
+            #* hexcodes[adr+1] = format(temp_hex, "02X")
+            hexcodes[adr+1] = temp_hex
+        elif op1type == "16bit":
             temp_hex = parse_number(op1)
             if temp_hex is None:
                 if op1 in symbols:
@@ -190,10 +197,14 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 print(line)
                 exit()
             else:
-                temp_hex = format(temp_hex, "04X")
-            hexcodes[adr] = format(lst[0]["val"], "02X")
-            hexcodes[adr+1] = temp_hex[2:4]
-            hexcodes[adr+2] = temp_hex[0:2]
+                #* temp_hex = format(temp_hex, "04X")
+                temp_hex = temp_hex
+            #* hexcodes[adr] = format(lst[0]["val"], "02X")
+            hexcodes[adr] = lst[0]["val"]
+            #* hexcodes[adr+1] = temp_hex[2:4]
+            hexcodes[adr+1] = temp_hex % 0x100
+            #* hexcodes[adr+2] = temp_hex[0:2]
+            hexcodes[adr+2] = temp_hex >> 8
     elif op1type is not None and op2type is not None:
         if op2type == 'reg':
             op1 = op1.lower()
@@ -207,8 +218,8 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     found = True
                     break
             if found:
-                hexcodes[adr] = format(val, "02X")
-                # print(hexcodes[adr])
+                #* hexcodes[adr] = format(val, "02X")
+                hexcodes[adr] = val
             else:
                 print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
                 print(line)
@@ -229,13 +240,15 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     print(f"Error at line {i}: Value of 2nd operand {op2} is invalid")
                     print(line)
                     exit()
-                hexcodes[adr] = format(val, "02X")
-                hexcodes[adr+1] = format(temp_hex, "02X")
+                #* hexcodes[adr] = format(val, "02X")
+                hexcodes[adr] = val
+                #* hexcodes[adr+1] = format(temp_hex, "02X")
+                hexcodes[adr+1] = temp_hex
             else:
                 print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
                 print(line)
                 exit()
-        elif op2type == "16bit": # TODO Labels need substitution
+        elif op2type == "16bit":
             op1 = op1.lower()
             found = False
             for d in lst:
@@ -260,10 +273,15 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     print(line)
                     exit()
                 else:
-                    temp_hex = format(temp_hex, "04X")
-                hexcodes[adr] = format(val, "02X")
-                hexcodes[adr+1] = temp_hex[2:4]
-                hexcodes[adr+2] = temp_hex[0:2]
+                    #* temp_hex = format(temp_hex, "04X")
+                    temp_hex = temp_hex
+                # hexcodes[adr] = format(val, "02X")
+                hexcodes[adr] = val
+                # hexcodes[adr+1] = temp_hex[2:4]
+                hexcodes[adr+1] = temp_hex % 0x100
+                # hexcodes[adr+2] = temp_hex[0:2]
+                hexcodes[adr+2] = temp_hex >> 8
+
             else:
                 print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
                 print(line)
@@ -273,6 +291,12 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
 # print(hexcodes)
 print("================= Hex codes =================")
 for key, value in sorted(hexcodes.items()):
-    print(f"addr[{key}] = {value}")
+    print(format(value, '02X'))
+    # print(f"addr[{key}] = {format(value, '02X')}")
 
 ############################## Hex Output ##############################
+# curr_key = -1
+# curr_value = -1
+hexline = []
+# tpl = (no, string_of_nos, checksum=0x100-(sum%0x100))
+    
