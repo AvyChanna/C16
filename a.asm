@@ -19,10 +19,12 @@ mov c        		,	     	 m; 4e
    	   pop psw; f1
 mvi a, 45h;	3e 45
 			    adi 60d; c6 3c
+; org 9000h
 	lxi b, l1;	01 34 12
 lxi h, 				0000000000000000000000007890h;	21 90 78
 sta l1; 32 34 12 [RANDOM COMMENT AHEAD] vpnawevioaw vqiuawlv.sn yuvws yuabv wyqb6vwbywayoqb67vyul sabcw u67vbwayws8ap basyvup87aws iyp78wavbvjiuyp7w8vs jiuawbpbv waiuwbv7u wbv[uia]
 sta 1234h; 32 34 12
+; org 9500h
 inx b; 03                                                   
 
 ; For comparision->

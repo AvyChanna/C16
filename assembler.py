@@ -137,7 +137,7 @@ for i, line in enumerate(lines, 1):
             exit()
 
 # print(symbols)
-print("================== Symbols ==================")
+print("================= Symbols =================")
 for key, value in sorted(symbols.items()):
     print(f"label[\"{key}\"] = {format(value, '02X')}")
 # print(parsed_line)
@@ -289,14 +289,49 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                             
 
 # print(hexcodes)
-print("================= Hex codes =================")
-for key, value in sorted(hexcodes.items()):
-    print(format(value, '02X'))
-    # print(f"addr[{key}] = {format(value, '02X')}")
+# print("================= Hex codes =================")
+# for key, value in sorted(hexcodes.items()):
+#     # print(format(value, '02X'))
+#     print(f"addr[{key}] = {format(value, '02X')}")
 
 ############################## Hex Output ##############################
-# curr_key = -1
-# curr_value = -1
+curr_addr = 0
+start_addr = 0
+curr_hex = None
+curr_sum = None
+length = 0
 hexline = []
-# tpl = (no, string_of_nos, checksum=0x100-(sum%0x100))
+# tpl = (length, start_addr, string)
+for addr, hexx in sorted(hexcodes.items()):
+    if length == 0:
+        start_addr = addr
+        curr_addr = addr
+        curr_hex = format(hexx, "02X")
+        curr_sum = hexx
+        length = 1
+    elif curr_addr+1 == addr and length < 0x10:
+        curr_addr += 1
+        curr_hex = curr_hex + format(hexx, "02X")
+        curr_sum += hexx
+        length += 1
+    else:
+        tpl = ":" + format(length, "02X") + format(start_addr%0xFFFF, "04X") + "00" + curr_hex + format(( 0x100 - ((curr_sum+length+start_addr+(start_addr>>8)) % 0x100)), "02X")
+        hexline.append(tpl)
+        start_addr = addr
+        curr_addr = addr
+        curr_hex = format(hexx, "02X")
+        curr_sum = hexx
+        length = 1
+if length != 0:
+    tpl = ":" + format(length, "02X") + format(start_addr%0xFFFF, "04X") + "00" + curr_hex + format(( 0x100 - ((curr_sum+length+start_addr+(start_addr>>8)) % 0x100)), "02X")
+    hexline.append(tpl)
+tpl = ":00" + format(((start_addr+length)%0xFFFF), "04X") + "01" + format(( 0x100 - ((start_addr+2+(start_addr>>8)) % 0x100)), "02X")
+hexline.append(tpl)
+
+print("================= HexFile =================")
+for i in hexline:
+    print(i)   
+with open(hexfile, "w") as f:
+    for i in hexline:
+        f.write(i+"\n")
     
