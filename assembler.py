@@ -160,7 +160,6 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
         exit()
 
     if op1type is None and op2type is None:
-        #* hexcodes[adr] = format(lst[0]["val"], "02X")
         hexcodes[adr] = lst[0]["val"]
     elif op1type is not None and op2type is None:
         if op1type == 'reg':
@@ -170,7 +169,6 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 val = d["val"]
                 if reg == op1:
                     break
-            #* hexcodes[adr] = format(val, "02X")
             hexcodes[adr] = val
         elif op1type == "8bit":
             op1 = op1.lower()
@@ -179,9 +177,7 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 print(f"Error at line {i}: Value of operand {op1} is invalid")
                 print(line)
                 exit()
-            #* hexcodes[adr] = format(lst[0]["val"], "02X")
             hexcodes[adr] = lst[0]["val"]
-            #* hexcodes[adr+1] = format(temp_hex, "02X")
             hexcodes[adr+1] = temp_hex
         elif op1type == "16bit":
             temp_hex = parse_number(op1)
@@ -197,13 +193,9 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                 print(line)
                 exit()
             else:
-                #* temp_hex = format(temp_hex, "04X")
                 temp_hex = temp_hex
-            #* hexcodes[adr] = format(lst[0]["val"], "02X")
             hexcodes[adr] = lst[0]["val"]
-            #* hexcodes[adr+1] = temp_hex[2:4]
             hexcodes[adr+1] = temp_hex % 0x100
-            #* hexcodes[adr+2] = temp_hex[0:2]
             hexcodes[adr+2] = temp_hex >> 8
     elif op1type is not None and op2type is not None:
         if op2type == 'reg':
@@ -218,7 +210,6 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     found = True
                     break
             if found:
-                #* hexcodes[adr] = format(val, "02X")
                 hexcodes[adr] = val
             else:
                 print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
@@ -240,9 +231,7 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     print(f"Error at line {i}: Value of 2nd operand {op2} is invalid")
                     print(line)
                     exit()
-                #* hexcodes[adr] = format(val, "02X")
                 hexcodes[adr] = val
-                #* hexcodes[adr+1] = format(temp_hex, "02X")
                 hexcodes[adr+1] = temp_hex
             else:
                 print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
@@ -272,12 +261,7 @@ for i, adr, opc, opno, op1, op2, line in parsed_line:
                     print(f"Error at line {i}: Value of operands {op1}, {op2} is invalid")
                     print(line)
                     exit()
-                else:
-                    #* temp_hex = format(temp_hex, "04X")
-                    temp_hex = temp_hex
-                # hexcodes[adr] = format(val, "02X")
                 hexcodes[adr] = val
-                # hexcodes[adr+1] = temp_hex[2:4]
                 hexcodes[adr+1] = temp_hex % 0x100
                 # hexcodes[adr+2] = temp_hex[0:2]
                 hexcodes[adr+2] = temp_hex >> 8
